@@ -24,19 +24,6 @@ public class ABCoreService extends Service {
     private Process mBitcoinProcess;
     private Process mTorProcess;
 
-    final ProcessLogger.OnError errorListener = new ProcessLogger.OnError() {
-        @Override
-        public void onError(final String[] error) {
-            final StringBuilder bf = new StringBuilder();
-            for (final String e : error) {
-                if (!TextUtils.isEmpty(e)) {
-                    bf.append(String.format("%s%s", e, System.getProperty("line.separator")));
-                    Log.e(TAG, "Process error - " + bf.toString());
-                }
-            }
-        }
-    };
-
     private final Thread bitcoinWaiterThread = new Thread(new Runnable() {
         @Override
         public void run() {
@@ -85,8 +72,6 @@ public class ABCoreService extends Service {
 
         } catch (final IOException e) {
             Log.e(TAG, "Native exception!", e);
-            Log.i(TAG, e.getMessage());
-            Log.i(TAG, e.getLocalizedMessage());
             mBitcoinProcess = null;
             mTorProcess = null;
             stopSelf();
@@ -115,7 +100,7 @@ public class ABCoreService extends Service {
     private void startTor() throws IOException {
         final String path = getNoBackupFilesDir().getCanonicalPath();
 
-        final ProcessBuilder torpb = new ProcessBuilder(
+        final ProcessBuilder torProcessBuilder = new ProcessBuilder(
                 String.format("%s/%s", path, "tor"),
                 "SafeSocks",
                 "1",
@@ -131,12 +116,25 @@ public class ABCoreService extends Service {
                 path + "/tordata"
         );
 
-        torpb.directory(new File(path));
+        torProcessBuilder.directory(new File(path));
 
-        mTorProcess = torpb.start();
+        mTorProcess = torProcessBuilder.start();
 
-        final ProcessLogger torErrorGobbler = new ProcessLogger(mTorProcess.getErrorStream(), errorListener);
-        final ProcessLogger torOutputGobbler = new ProcessLogger(mTorProcess.getInputStream(), errorListener);
+        final ProcessLogger.OnError torErrorListener = new ProcessLogger.OnError() {
+            @Override
+            public void onError(final String[] error) {
+                final StringBuilder bf = new StringBuilder();
+                for (final String e : error) {
+                    if (!TextUtils.isEmpty(e)) {
+                        bf.append(String.format("%s%s", e, System.getProperty("line.separator")));
+                        Log.e(TAG, "Tor process error - " + bf.toString());
+                    }
+                }
+            }
+        };
+
+        final ProcessLogger torErrorGobbler = new ProcessLogger(mTorProcess.getErrorStream(), torErrorListener);
+        final ProcessLogger torOutputGobbler = new ProcessLogger(mTorProcess.getInputStream(), torErrorListener);
 
         torErrorGobbler.start();
         torOutputGobbler.start();
@@ -146,25 +144,37 @@ public class ABCoreService extends Service {
 
     private void startBitcoin() throws IOException {
         final String path = getNoBackupFilesDir().getCanonicalPath();
-        // allow to pass in a different datadir directory
 
-        // HACK: if user sets a datadir in the bitcoin.conf file that should then be the one
-        // used
+        // allow to pass in a different datadir directory
+        // HACK: if user sets a datadir in the bitcoin.conf file that should then be the one used
         final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         final String useDistribution = prefs.getString("usedistribution", "core");
         final String daemon = "liquid".equals(useDistribution) ? "liquidd" : "bitcoind";
-        final ProcessBuilder pb = new ProcessBuilder(
+        final ProcessBuilder bitcoinProcessBuilder = new ProcessBuilder(
                 String.format("%s/%s", path, daemon),
                 "--server=1",
                 String.format("--datadir=%s", Utils.getDataDir(this)),
                 String.format("--conf=%s", Utils.getBitcoinConf(this)));
 
-        pb.directory(new File(path));
+        bitcoinProcessBuilder.directory(new File(path));
 
-        mBitcoinProcess = pb.start();
+        mBitcoinProcess = bitcoinProcessBuilder.start();
 
-        final ProcessLogger errorGobbler = new ProcessLogger(mBitcoinProcess.getErrorStream(), errorListener);
-        final ProcessLogger outputGobbler = new ProcessLogger(mBitcoinProcess.getInputStream(), errorListener);
+        final ProcessLogger.OnError btcErrorListener = new ProcessLogger.OnError() {
+            @Override
+            public void onError(final String[] error) {
+                final StringBuilder bf = new StringBuilder();
+                for (final String e : error) {
+                    if (!TextUtils.isEmpty(e)) {
+                        bf.append(String.format("%s%s", e, System.getProperty("line.separator")));
+                        Log.e(TAG, "Bitcoin process error - " + bf.toString());
+                    }
+                }
+            }
+        };
+
+        final ProcessLogger errorGobbler = new ProcessLogger(mBitcoinProcess.getErrorStream(), btcErrorListener);
+        final ProcessLogger outputGobbler = new ProcessLogger(mBitcoinProcess.getInputStream(), btcErrorListener);
 
         errorGobbler.start();
         outputGobbler.start();
