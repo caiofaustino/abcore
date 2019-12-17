@@ -23,4 +23,5 @@
     <string name="switchcoreon">Switch ON</string>
     <string name="switchcoreoff">Switch OFF</string>
     <string name="progress_bar_message">Processed %1d%% (block height %2d)</string>
+    <string name="permission_required">Datadir in external folder requires storage permission.</string>
 </resources>

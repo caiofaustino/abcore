@@ -1,5 +1,6 @@
 package com.greenaddress.abcore;
 
+import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -7,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Build;
@@ -25,8 +27,11 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import com.google.zxing.WriterException;
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
@@ -36,13 +41,18 @@ import com.google.zxing.qrcode.encoder.Encoder;
 
 public class MainActivity extends AppCompatActivity {
     private final static String TAG = MainActivity.class.getName();
+
+    private final static int SCALE = 4;
+    private final static int STORAGE_PERMISSION_REQUEST = 0;
+
     private RPCResponseReceiver mRpcResponseReceiver;
     private TextView mTvStatus;
     private Switch mSwitchCore;
     private TextView mQrCodeText;
     private ImageView mImageViewQr;
 
-    private final static int SCALE = 4;
+
+
     private boolean mSwitchOn = false;
     private enum DaemonStatus {
         UNKNOWN,
@@ -97,40 +107,6 @@ public class MainActivity extends AppCompatActivity {
             }
             // when mDaemonStatus = STOPPED, switch OFF and daemon is not running, so nothing to do
         }
-    }
-
-    private void stopDaemonAndSetStatus(){
-        mSwitchOn = false;
-        mDaemonStatus = DaemonStatus.STOPPING;
-        mTvStatus.setText(getString(R.string.status_header, mDaemonStatus.toString()));
-        mSwitchCore.setText(R.string.switchcoreon);
-        final Intent i = new Intent(MainActivity.this, RPCIntentService.class);
-        i.putExtra("stop", "yep");
-        startService(i);
-    }
-
-    private void setSwitch() {
-        mSwitchCore.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            public void onCheckedChanged(final CompoundButton buttonView, final boolean isChecked) {
-                if (isChecked) {
-                    mSwitchOn = true;
-                    mDaemonStatus = DaemonStatus.STARTING;
-                    mTvStatus.setText(getString(R.string.status_header, mDaemonStatus.toString()));
-                    mSwitchCore.setText(R.string.switchcoreoff);
-                    final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
-                    final SharedPreferences.Editor e = prefs.edit();
-                    e.putBoolean("magicallystarted", false);
-                    e.apply();
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        startForegroundService(new Intent(MainActivity.this, ABCoreService.class));
-                    } else {
-                        startService(new Intent(MainActivity.this, ABCoreService.class));
-                    }
-                } else {
-                    stopDaemonAndSetStatus();
-                }
-            }
-        });
     }
 
     @Override
@@ -230,9 +206,76 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == STORAGE_PERMISSION_REQUEST) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                startDaemonAndSetStatus();
+            } else {
+                mSwitchCore.setChecked(false);
+                Toast.makeText(MainActivity.this, R.string.permission_required, Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    private void setSwitch() {
+        mSwitchCore.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            public void onCheckedChanged(final CompoundButton buttonView, final boolean isChecked) {
+                if (isChecked) {
+                    if (checkPermissions()) {
+                        startDaemonAndSetStatus();
+                    } else {
+                        mSwitchCore.setChecked(false);
+                    }
+                } else {
+                    stopDaemonAndSetStatus();
+                }
+            }
+        });
+    }
+
+    private void startDaemonAndSetStatus() {
+        mSwitchOn = true;
+        mDaemonStatus = DaemonStatus.STARTING;
+        mTvStatus.setText(getString(R.string.status_header, mDaemonStatus.toString()));
+        mSwitchCore.setText(R.string.switchcoreoff);
+        final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
+        final SharedPreferences.Editor e = prefs.edit();
+        e.putBoolean("magicallystarted", false);
+        e.apply();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(new Intent(MainActivity.this, ABCoreService.class));
+        } else {
+            startService(new Intent(MainActivity.this, ABCoreService.class));
+        }
+    }
+
+    private void stopDaemonAndSetStatus(){
+        mSwitchOn = false;
+        mDaemonStatus = DaemonStatus.STOPPING;
+        mTvStatus.setText(getString(R.string.status_header, mDaemonStatus.toString()));
+        mSwitchCore.setText(R.string.switchcoreon);
+        final Intent i = new Intent(MainActivity.this, RPCIntentService.class);
+        i.putExtra("stop", "yep");
+        startService(i);
+    }
+
+    private boolean checkPermissions() {
+        final boolean isInternalStorage =
+                Utils.getDataDir(this).startsWith(getNoBackupFilesDir().getAbsolutePath());
+        final boolean hasStoragePermission =
+                ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+
+        if (!isInternalStorage && !hasStoragePermission) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, STORAGE_PERMISSION_REQUEST);
+            return false;
+        }
+        return true;
+    }
+
     public class RPCResponseReceiver extends BroadcastReceiver {
-        public static final String ACTION_RESP =
-                "com.greenaddress.intent.action.RPC_PROCESSED";
+        public static final String ACTION_RESP = "com.greenaddress.intent.action.RPC_PROCESSED";
 
         @Override
         public void onReceive(final Context context, final Intent intent) {
