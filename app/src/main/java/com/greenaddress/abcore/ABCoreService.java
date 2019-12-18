@@ -133,8 +133,8 @@ public class ABCoreService extends Service {
             }
         };
 
-        final ProcessLogger torErrorGobbler = new ProcessLogger(mTorProcess.getErrorStream(), torErrorListener);
-        final ProcessLogger torOutputGobbler = new ProcessLogger(mTorProcess.getInputStream(), torErrorListener);
+        final ProcessLogger torErrorGobbler = new ProcessLogger(mTorProcess.getErrorStream(),"TOR-ERR", torErrorListener);
+        final ProcessLogger torOutputGobbler = new ProcessLogger(mTorProcess.getInputStream(), "TOR", torErrorListener);
 
         torErrorGobbler.start();
         torOutputGobbler.start();
@@ -173,8 +173,8 @@ public class ABCoreService extends Service {
             }
         };
 
-        final ProcessLogger errorGobbler = new ProcessLogger(mBitcoinProcess.getErrorStream(), btcErrorListener);
-        final ProcessLogger outputGobbler = new ProcessLogger(mBitcoinProcess.getInputStream(), btcErrorListener);
+        final ProcessLogger errorGobbler = new ProcessLogger(mBitcoinProcess.getErrorStream(), "BTC-ERR", btcErrorListener);
+        final ProcessLogger outputGobbler = new ProcessLogger(mBitcoinProcess.getInputStream(), "BTC", btcErrorListener);
 
         errorGobbler.start();
         outputGobbler.start();
