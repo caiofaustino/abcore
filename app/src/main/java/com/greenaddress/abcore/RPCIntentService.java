@@ -177,6 +177,11 @@ public class RPCIntentService extends IntentService {
                     getRpc().stop();
                     break;
                 } catch (final BitcoinRPCException | IOException e) {
+                    if (e instanceof BitcoinRPCException && ((BitcoinRPCException) e).getResponse() == null) {
+                        Log.e(TAG, "daemon not responding, already stopped");
+                        broadcastError(e);
+                        break;
+                    }
                     try {
                         Thread.sleep(200);
                     } catch (final InterruptedException e1) {
