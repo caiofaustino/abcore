@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
@@ -28,6 +29,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
@@ -37,6 +39,8 @@ import com.google.zxing.WriterException;
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 import com.google.zxing.qrcode.encoder.ByteMatrix;
 import com.google.zxing.qrcode.encoder.Encoder;
+
+import java.io.File;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -211,7 +215,7 @@ public class MainActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == STORAGE_PERMISSION_REQUEST) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                startDaemonAndSetStatus();
+                checkDataDirExistsAndStart();
             } else {
                 mSwitchCore.setChecked(false);
                 Toast.makeText(MainActivity.this, R.string.permission_required, Toast.LENGTH_LONG).show();
@@ -224,7 +228,7 @@ public class MainActivity extends AppCompatActivity {
             public void onCheckedChanged(final CompoundButton buttonView, final boolean isChecked) {
                 if (isChecked) {
                     if (checkPermissions()) {
-                        startDaemonAndSetStatus();
+                        checkDataDirExistsAndStart();
                     } else {
                         mSwitchCore.setChecked(false);
                     }
@@ -248,6 +252,37 @@ public class MainActivity extends AppCompatActivity {
             startForegroundService(new Intent(MainActivity.this, ABCoreService.class));
         } else {
             startService(new Intent(MainActivity.this, ABCoreService.class));
+        }
+    }
+
+    private void checkDataDirExistsAndStart() {
+        final File dataDirFile = new File(Utils.getDataDir(this));
+        if (dataDirFile.exists() && dataDirFile.isDirectory()) {
+            startDaemonAndSetStatus();
+        } else {
+            new AlertDialog.Builder(this)
+                    .setTitle(R.string.create_dir_dialog_title)
+                    .setMessage(getString(R.string.create_dir_dialog_msg, dataDirFile.getAbsolutePath()))
+                    .setPositiveButton(R.string.yes, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            if (dataDirFile.mkdirs()) {
+                                startDaemonAndSetStatus();
+                            } else {
+                                Toast.makeText(MainActivity.this, R.string.create_dir_failed_msg, Toast.LENGTH_LONG).show();
+                                mSwitchCore.setChecked(false);
+                            }
+                        }
+                    })
+                    .setNegativeButton(R.string.no, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            Toast.makeText(MainActivity.this, R.string.create_dir_failed_msg, Toast.LENGTH_LONG).show();
+                            mSwitchCore.setChecked(false);
+                        }
+                    })
+                    .create()
+                    .show();
         }
     }
 
