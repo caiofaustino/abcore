@@ -155,6 +155,14 @@ public class RPCIntentService extends IntentService {
         sendBroadcast(broadcastIntent);
     }
 
+    private void broadcastStop() {
+        Log.e(TAG, "broadcastStop");
+        final Intent broadcastIntent = new Intent();
+        broadcastIntent.setAction(MainActivity.RPCResponseReceiver.ACTION_RESP);
+        broadcastIntent.addCategory(Intent.CATEGORY_DEFAULT);
+        broadcastIntent.putExtra(PARAM_OUT_MSG, "stopped");
+        sendBroadcast(broadcastIntent);
+    }
 
     @Override
     protected void onHandleIntent(final Intent intent) {
@@ -175,6 +183,7 @@ public class RPCIntentService extends IntentService {
             while (true) {
                 try {
                     getRpc().stop();
+                    broadcastStop();
                     break;
                 } catch (final BitcoinRPCException | IOException e) {
                     if (e instanceof BitcoinRPCException && ((BitcoinRPCException) e).getResponse() == null) {
@@ -182,6 +191,7 @@ public class RPCIntentService extends IntentService {
                         broadcastError(e);
                         break;
                     }
+                    Log.v(TAG, "stop failed, looping back");
                     try {
                         Thread.sleep(200);
                     } catch (final InterruptedException e1) {
