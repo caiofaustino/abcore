@@ -215,7 +215,7 @@ public class MainActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == STORAGE_PERMISSION_REQUEST) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                checkDataDirExistsAndStart();
+                mSwitchCore.setChecked(true);
             } else {
                 mSwitchCore.setChecked(false);
                 Toast.makeText(MainActivity.this, R.string.permission_required, Toast.LENGTH_LONG).show();
