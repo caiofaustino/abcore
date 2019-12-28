@@ -43,7 +43,7 @@ public class ABCoreService extends Service {
             try {
                 final int exit = mTorProcess.waitFor();
                 Log.i(TAG, "Tor process finished - " + exit);
-                stopSelf();
+                // if the Tor process stops, the Bitcoin process will already stop itself
             } catch (InterruptedException e) {
                 Log.e(TAG, "Tor InterruptedException", e);
             }
